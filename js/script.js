@@ -22,6 +22,7 @@ let bulkDeleteScopeId = null;
 let bulkDeleteSelection = new Set();
 let copiedRichFormat = null;
 let formatPainterArmed = false;
+let formatPainterSticky = false, formatPainterLastClick = 0, paintSourceSignature = '', paintSourceEditor = null, lastPaintSignature = '', lastPaintEditor = null;
 const ICON_CHOICES = ['📁','📂','📄','📚','📝','📋','📌','📊','💻','🖥️','📱','⚙️','🛠️','🔧','💬','☎️','🎧','👥','👤','🏢','🏫','🎓','📅','⏰','✅','❓','⚠️','🔔','🔒','🔑'];
 
 function getCurrentDisplayName() {
@@ -530,6 +531,7 @@ async function previewCategoryIcon(event) { try { pendingCategoryIconImage = awa
 function clearCategoryIconImage(id) { const node=findNode(id); if(!node)return; delete node.iconImage; pendingCategoryIconImage=null; saveLocalChanges(false); renderAll(); renderCategoryPage(id); }
 function syncCurrentEditorToDatabase() {
   if (!isAdmin) return;
+  { const _ed=document.activeElement?.closest?.('.section-content-editor')||activeRichEditor; if(_ed) recordRichHistory(_ed); }
   const topicForm=document.getElementById('topicUpdateForm');
   if(topicForm && !topicForm.hidden && newUpdateDraft && newUpdateDraft.mode==='topic'){newUpdateDraft.sections=readSectionsFromContainer('topicSectionsEditor');return;}
   if(currentCatId==null)return;
@@ -1210,6 +1212,9 @@ function sanitizeRichHTML(html) {
 }
 function richToolbarMarkup(){
   return `<div class="content-format-toolbar" role="toolbar" aria-label="أدوات تنسيق المحتوى">
+    <button type="button" title="تراجع (Ctrl+Z)" onmousedown="preserveRichSelection(event)" onclick="richUndo()">↶</button>
+    <button type="button" title="إعادة (Ctrl+Y)" onmousedown="preserveRichSelection(event)" onclick="richRedo()">↷</button>
+    <span class="toolbar-separator"></span>
     <button type="button" title="عريض" onmousedown="preserveRichSelection(event)" onclick="formatCurrentContent('bold')"><b>B</b></button>
     <button type="button" title="مائل" onmousedown="preserveRichSelection(event)" onclick="formatCurrentContent('italic')"><i>I</i></button>
     <button type="button" title="تحته خط" onmousedown="preserveRichSelection(event)" onclick="formatCurrentContent('underline')"><u>U</u></button>
@@ -1229,7 +1234,7 @@ function richToolbarMarkup(){
     <button type="button" title="قائمة نقطية" onmousedown="preserveRichSelection(event)" onclick="formatCurrentContent('insertUnorderedList')">•</button>
     <button type="button" title="قائمة رقمية" onmousedown="preserveRichSelection(event)" onclick="formatCurrentContent('insertOrderedList')">1.</button>
     <select title="تغيير حالة الحروف الإنجليزية" onmousedown="preserveRichSelection(event)" onchange="changeSelectedTextCase(this.value);this.value=''"><option value="">Change Case</option><option value="upper">UPPERCASE</option><option value="lower">lowercase</option><option value="title">Capitalize Each Word</option></select>
-    <button type="button" id="formatPainterButton" class="format-painter-button" title="حدد نصًا منسقًا ثم اضغط هنا، وبعدها حدد النص الجديد ليأخذ نفس التنسيق" onmousedown="preserveRichSelection(event)" onclick="formatPainterAction()">🖌 نسخ التنسيق</button>
+    <button type="button" id="formatPainterButton" class="format-painter-button" title="حدد نصًا منسقًا ثم اضغط هنا وحدد النص الجديد (مرة واحدة). دبل كليك = يفضل شغال على أكثر من نص لحد ما تضغط Esc" onmousedown="preserveRichSelection(event)" onclick="formatPainterAction()">🖌 نسخ التنسيق</button>
     <span class="toolbar-separator"></span>
     <button type="button" class="toolbar-image-button" title="إضافة صورة أو أكثر" onmousedown="preserveRichSelection(event)" onclick="openRichImagePicker()">🖼 إضافة صورة</button>
     <button type="button" title="الصورة ناحية اليمين والنص بجانبها" onmousedown="preserveRichSelection(event)" onclick="setSelectedImageFloat('right')">صورة يمين</button>
@@ -1237,15 +1242,23 @@ function richToolbarMarkup(){
     <button type="button" title="الصورة في المنتصف وأسفلها النص" onmousedown="preserveRichSelection(event)" onclick="setSelectedImageFloat('none')">صورة وسط</button>
   </div>`;
 }
-function setFormatPainterState(armed){
-  formatPainterArmed=!!armed;
+function setFormatPainterState(armed,sticky=false){
+  formatPainterArmed=!!armed;formatPainterSticky=!!armed&&!!sticky;
+  if(!armed){lastPaintSignature='';lastPaintEditor=null;}
   document.querySelectorAll('.format-painter-button').forEach(button=>{
     button.classList.toggle('is-armed',formatPainterArmed);
-    button.textContent=formatPainterArmed?'🖌 اختر النص الهدف':'🖌 نسخ التنسيق';
+    button.classList.toggle('is-sticky',formatPainterSticky);
+    button.textContent=!formatPainterArmed?'🖌 نسخ التنسيق':(formatPainterSticky?'🖌 تنسيق متكرر — Esc للإنهاء':'🖌 اختر النص الهدف');
   });
 }
+function cancelFormatPainter(){setFormatPainterState(false);copiedRichFormat=null;}
 function formatPainterAction(){
-  if(formatPainterArmed){setFormatPainterState(false);copiedRichFormat=null;return;}
+  const now=Date.now();
+  if(formatPainterArmed){
+    // دبل كليك (كليكان سريعان) = وضع متكرر يفضل شغال لحد Esc، كليك عادي = إلغاء
+    if(!formatPainterSticky&&now-formatPainterLastClick<450){setFormatPainterState(true,true);formatPainterLastClick=0;return;}
+    cancelFormatPainter();return;
+  }
   if(!restoreRichSelection()){alert('حدد نصًا منسقًا داخل جزء المحتوى أولاً.');return;}
   const selection=window.getSelection();if(!selection||!selection.rangeCount||selection.getRangeAt(0).collapsed){alert('حدد النص الذي تريد نسخ تنسيقه أولاً.');return;}
   const range=selection.getRangeAt(0);const anchor=range.startContainer.nodeType===1?range.startContainer:range.startContainer.parentElement;
@@ -1263,29 +1276,142 @@ function formatPainterAction(){
     direction:source.getAttribute('dir')||computed.direction,
     paragraph:sourceBlock!==editor?{textAlign:blockStyle.textAlign,marginLeft:blockStyle.marginLeft,marginRight:blockStyle.marginRight,textIndent:blockStyle.textIndent}:null
   };
-  setFormatPainterState(true);
+  const offsets=richGetOffsets(editor);paintSourceSignature=offsets?`${offsets.start}-${offsets.end}`:'';paintSourceEditor=editor;
+  formatPainterLastClick=now;setFormatPainterState(true,false);
+}
+function richFullyInRange(range,el){
+  const r=document.createRange();r.selectNode(el);
+  return range.compareBoundaryPoints(Range.START_TO_START,r)<=0&&range.compareBoundaryPoints(Range.END_TO_END,r)>=0;
+}
+// يشيل التنسيقات القديمة من النص المحدد حتى يظهر التنسيق المنسوخ بوضوح بدل ما يتداخل معها
+function stripRichFormattingInRange(editor,range){
+  const props=['color','background-color','background','font-size','font-weight','font-style','text-decoration','text-decoration-line'];
+  [...editor.querySelectorAll('span,font,b,strong,i,em,u,s,strike,mark')].forEach(el=>{
+    try{if(!range.intersectsNode(el)||!richFullyInRange(range,el))return;}catch(_){return;}
+    if(el.tagName==='SPAN'){props.forEach(p=>el.style.removeProperty(p));}
+    else{while(el.firstChild)el.parentNode.insertBefore(el.firstChild,el);el.remove();}
+  });
 }
 function maybeApplyRichFormatPainter(){
   if(!formatPainterArmed||!copiedRichFormat)return;
   rememberRichSelection();
-  if(!restoreRichSelection())return;
   const selection=window.getSelection();if(!selection||!selection.rangeCount)return;
   const range=selection.getRangeAt(0);if(range.collapsed)return;
   const anchor=range.commonAncestorContainer.nodeType===1?range.commonAncestorContainer:range.commonAncestorContainer.parentElement;
-  if(!anchor?.closest?.('.section-content-editor'))return;
-  const wrapper=document.createElement('span');
-  Object.entries(copiedRichFormat).forEach(([key,value])=>{if(value&&key!=='direction')wrapper.style[key]=value;});
-  if(copiedRichFormat.direction==='rtl'||copiedRichFormat.direction==='ltr'){wrapper.dir=copiedRichFormat.direction;wrapper.style.unicodeBidi='isolate';}
+  const editor=anchor?.closest?.('.section-content-editor');if(!editor)return;
+  activeRichEditor=editor;
+  const offsets=richGetOffsets(editor);const sig=offsets?`${offsets.start}-${offsets.end}`:'';
+  if(sig&&editor===paintSourceEditor&&sig===paintSourceSignature)return;   // نفس النص المنسوخ منه
+  if(sig&&editor===lastPaintEditor&&sig===lastPaintSignature)return;       // نفس التحديد اتطبّق عليه قبل كده
+  const f=copiedRichFormat;
   try{
-    const targetBlock=(anchor.nodeType===1?anchor:anchor.parentElement)?.closest('p,li,blockquote');
-    const fragment=range.extractContents();wrapper.appendChild(fragment);range.insertNode(wrapper);
-    if(targetBlock&&copiedRichFormat.paragraph){
-      Object.entries(copiedRichFormat.paragraph).forEach(([key,value])=>{if(value&&value!=='auto')targetBlock.style[key]=value;});
+    recordRichHistory(editor);                       // نقطة رجوع قبل التطبيق
+    stripRichFormattingInRange(editor,range);
+    richSetOffsets(editor,offsets);
+    const sel2=window.getSelection();const r2=sel2.rangeCount?sel2.getRangeAt(0):range;
+    if(f.paragraph){
+      // الفقرات التي بها نص محدد فعلاً فقط (التحديد بتلات كليك قد يلمس بداية الفقرة التالية دون أن يشمل منها حرفًا)
+      const blocks=new Set();
+      selectedTextNodes(r2,editor).forEach(node=>{
+        const from=r2.startContainer===node?r2.startOffset:0;const to=r2.endContainer===node?r2.endOffset:node.length;
+        if(to<=from)return;
+        const block=node.parentElement?.closest('p,li,blockquote,div');if(block&&editor.contains(block)&&block!==editor)blocks.add(block);
+      });
+      [...blocks].filter(b=>![...blocks].some(o=>o!==b&&b.contains(o))).forEach(b=>{
+        Object.entries(f.paragraph).forEach(([k,v])=>{if(v&&v!=='auto'&&v!=='start')b.style[k]=v;});
+      });
     }
-    const next=document.createRange();next.selectNodeContents(wrapper);selection.removeAllRanges();selection.addRange(next);
+    const styles={color:f.color,backgroundColor:f.backgroundColor,fontSize:f.fontSize,fontWeight:f.fontWeight,fontStyle:f.fontStyle,textDecoration:f.textDecoration};
+    const attrs={};
+    if(f.direction==='rtl'||f.direction==='ltr'){attrs.dir=f.direction;styles.unicodeBidi='isolate';}
+    if(!wrapRichSelection(styles,attrs)){syncCurrentEditorToDatabase();}
   }catch(error){console.warn('تعذر تطبيق نسخ التنسيق',error);return;}
-  setFormatPainterState(false);syncCurrentEditorToDatabase();rememberRichSelection();
+  if(formatPainterSticky){lastPaintSignature=sig;lastPaintEditor=editor;}
+  else cancelFormatPainter();
+  rememberRichSelection();
 }
+
+/* ===== التراجع والإعادة (Undo / Redo) للمحرر =====
+   المتصفح لا يسجّل في سجله التعديلات التي تتم عبر JavaScript (تغيير الألوان والخطوط ونسخ التنسيق...)،
+   لذلك نحتفظ بسجل خاص بكل محرر محتوى. */
+const richHistory=new WeakMap();
+let richHistoryRestoring=false,richHistoryCoalesce=false;
+function richGetOffsets(editor){
+  const sel=window.getSelection();if(!sel||!sel.rangeCount)return null;
+  const r=sel.getRangeAt(0);if(!editor.contains(r.startContainer)||!editor.contains(r.endContainer))return null;
+  const pre=document.createRange();pre.selectNodeContents(editor);pre.setEnd(r.startContainer,r.startOffset);
+  const start=pre.toString().length;return{start,end:start+r.toString().length};
+}
+function richSetOffsets(editor,o){
+  if(!o||!editor)return;
+  const walker=document.createTreeWalker(editor,NodeFilter.SHOW_TEXT);let pos=0,sNode=null,sOff=0,eNode=null,eOff=0,n;
+  while((n=walker.nextNode())){
+    const len=n.nodeValue.length;
+    if(!sNode&&o.start<=pos+len){sNode=n;sOff=o.start-pos;}
+    if(!eNode&&o.end<=pos+len){eNode=n;eOff=o.end-pos;break;}
+    pos+=len;
+  }
+  const r=document.createRange();
+  try{
+    if(sNode&&eNode){r.setStart(sNode,sOff);r.setEnd(eNode,eOff);}else{r.selectNodeContents(editor);r.collapse(false);}
+    const sel=window.getSelection();sel.removeAllRanges();sel.addRange(r);savedRichRange=r.cloneRange();
+  }catch(_){}
+}
+function richHistoryOf(editor){
+  let h=richHistory.get(editor);
+  if(!h){h={stack:[{html:editor.innerHTML,sel:richGetOffsets(editor),t:0,typing:false}],idx:0};richHistory.set(editor,h);}
+  return h;
+}
+function recordRichHistory(editor){
+  const coalesce=richHistoryCoalesce;richHistoryCoalesce=false;
+  if(!editor||!editor.isConnected||richHistoryRestoring)return;
+  const h=richHistoryOf(editor);const html=editor.innerHTML;const cur=h.stack[h.idx];
+  if(cur.html===html)return;
+  const now=Date.now();const sel=richGetOffsets(editor);
+  h.stack.splice(h.idx+1);
+  if(coalesce&&cur.typing&&h.idx>0&&now-cur.t<1200){cur.html=html;cur.sel=sel;cur.t=now;}
+  else{
+    h.stack.push({html,sel,t:now,typing:coalesce});h.idx=h.stack.length-1;
+    const max=html.length>500000?15:80;while(h.stack.length>max){h.stack.shift();h.idx--;}
+  }
+}
+function richHistoryEditor(){
+  const a=document.activeElement?.closest?.('.section-content-editor');
+  return a||(activeRichEditor&&activeRichEditor.isConnected?activeRichEditor:null);
+}
+function richApplySnapshot(editor,snap){
+  richHistoryRestoring=true;
+  try{editor.innerHTML=snap.html;activeRichImage=null;editor.focus({preventScroll:true});richSetOffsets(editor,snap.sel);}
+  finally{richHistoryRestoring=false;}
+  syncCurrentEditorToDatabase();
+}
+function richUndo(){
+  const ed=richHistoryEditor();if(!ed)return;
+  recordRichHistory(ed);const h=richHistoryOf(ed);
+  if(h.idx<=0)return;h.idx--;richApplySnapshot(ed,h.stack[h.idx]);
+}
+function richRedo(){
+  const ed=richHistoryEditor();if(!ed)return;
+  const h=richHistoryOf(ed);if(h.idx>=h.stack.length-1)return;
+  h.idx++;richApplySnapshot(ed,h.stack[h.idx]);
+}
+document.addEventListener('keydown',event=>{
+  if(typeof isAdmin==='undefined'||!isAdmin)return;
+  if(!event.target?.closest?.('.section-content-editor'))return;
+  if(!(event.ctrlKey||event.metaKey)||event.altKey)return;
+  // نستخدم event.code حتى يعمل الاختصار مع لوحة المفاتيح العربية أيضًا
+  if(event.code==='KeyZ'&&!event.shiftKey){event.preventDefault();richUndo();}
+  else if(event.code==='KeyY'||(event.code==='KeyZ'&&event.shiftKey)){event.preventDefault();richRedo();}
+},true);
+document.addEventListener('beforeinput',event=>{
+  if(event.inputType!=='historyUndo'&&event.inputType!=='historyRedo')return;
+  if(!event.target?.closest?.('.section-content-editor'))return;
+  event.preventDefault();event.inputType==='historyUndo'?richUndo():richRedo();
+},true);
+document.addEventListener('input',event=>{
+  if(event.target?.closest?.('.section-content-editor'))richHistoryCoalesce=/^(insertText|insertCompositionText|deleteContent)/.test(event.inputType||'');
+},true);
+
 function sectionEditorMarkup(sec,i){
   const id=sec.id||`sec-${currentCatId??'new'}-${i+1}`;
   const content=sec.format==='html'?sanitizeRichHTML(sec.content||''):escapeHTML(sec.content||'').replace(/\n/g,'<br>');
@@ -1294,13 +1420,13 @@ function sectionEditorMarkup(sec,i){
   return `<div class="section-editor-item ${sectionSelected?'bulk-delete-selected':''}" data-section-index="${i}" data-section-id="${escapeHTML(id)}">
     <div class="section-editor-head">${selector}<strong>جزء ${i+1}</strong><button type="button" class="btn-del-small" onclick="removeContentSection(this)">حذف الجزء</button></div>
     <label>عنوان الجزء</label><input class="section-title-input" value="${escapeHTML(sec.title||'')}" placeholder="مثال: الرؤية والرسالة" oninput="syncCurrentEditorToDatabase()">
-    <label>المحتوى</label><div class="section-content-editor" contenteditable="true" dir="rtl" data-placeholder="اكتب محتوى الجزء هنا..." onfocus="setActiveRichEditor(this)" oninput="rememberRichSelection();maybeApplyRichFormatPainter();syncCurrentEditorToDatabase()" onkeyup="rememberRichSelection();maybeApplyRichFormatPainter()" onmouseup="rememberRichSelection();maybeApplyRichFormatPainter()" onpaste="handleRichPaste(event)">${content}</div>
+    <label>المحتوى</label><div class="section-content-editor" contenteditable="true" dir="rtl" data-placeholder="اكتب محتوى الجزء هنا..." onfocus="setActiveRichEditor(this)" oninput="rememberRichSelection();syncCurrentEditorToDatabase()" onkeyup="rememberRichSelection()" onmouseup="rememberRichSelection();maybeApplyRichFormatPainter()" onpaste="handleRichPaste(event)">${content}</div>
     <div class="section-order"><button type="button" onclick="moveContentSection(this,-1)">↑ لأعلى</button><button type="button" onclick="moveContentSection(this,1)">↓ لأسفل</button></div>
   </div>`;
 }
 function setActiveRichEditor(editor){
   if(!editor||!editor.isConnected)return;
-  activeRichEditor=editor;rememberRichSelection();
+  activeRichEditor=editor;richHistoryOf(editor);rememberRichSelection();
   const launcher=document.getElementById('richToolbarLauncher');
   if(launcher&&isAdmin){launcher.hidden=false;document.body.classList.add('has-active-rich-editor');}
 }
@@ -1581,7 +1707,7 @@ window.addEventListener('scroll', updateFloatingNav, { passive: true });
 window.addEventListener('scroll',positionFloatingRichToolbar,{passive:true});
 window.addEventListener('scroll',positionHeroSearchResults,{passive:true});
 window.addEventListener('resize',()=>{const panel=document.getElementById('quickSearchPanel');if(panel?.classList.contains('is-open'))positionQuickSearchPanel();positionHeroSearchResults();positionFloatingRichToolbar();},{passive:true});
-document.addEventListener('keydown', event => { if(event.key==='Escape'){closeQuickSearch();clearHeroSearch();} });
+document.addEventListener('keydown', event => { if(event.key==='Escape'){closeQuickSearch();clearHeroSearch();if(formatPainterArmed)cancelFormatPainter();} });
 document.addEventListener('selectionchange', rememberRichSelection);
 document.addEventListener('click', event => {
   const panel=document.getElementById('quickSearchPanel');
