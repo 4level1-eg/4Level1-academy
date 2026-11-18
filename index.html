@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>قاعدة المعرفة لدى 4Level1</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ================= 1. شاشة تسجيل الدخول ================= -->
+  <div id="login-overlay">
+    <div class="login-box">
+      <div class="login-logo"><img src="images/4level1-logo-white.png" alt="4Level1 English Language Institute"></div>
+      <h2>بوابة قاعدة المعرفة</h2>
+      <p>أدخل كلمة المرور الخاصة بفريق العمل للمتابعة</p>
+      <input type="password" id="loginPassInput" placeholder="كلمة المرور (الافتراضية: 1234)" onkeyup="if(event.key==='Enter') doLogin()">
+      <button onclick="doLogin()">دخول إلى المنصة</button>
+      <div id="login-error">⚠️ كلمة المرور غير صحيحة، حاول مرة أخرى</div>
+    </div>
+  </div>
+
+  <!-- ================= 2. شريط وضع التعديل للإدارة ================= -->
+  <div id="admin-bar">
+    <div>🛠️ <strong>وضع التعديل نشط:</strong> يمكنك إنشاء المجلدات وصفحات المحتوى وإعادة تنظيمها بالسحب والإفلات.</div>
+    <div class="admin-actions">
+      <button class="btn-admin btn-pass" onclick="changePasswords()">🔑 تغيير كلمات المرور</button>
+      <button class="btn-admin btn-new-page" onclick="openNewPageForm()">＋ إضافة مجلد رئيسي</button>
+      <button class="btn-admin btn-pass" onclick="addHomeGroup()">＋ إضافة قسم رئيسي</button>
+      <button class="btn-admin btn-pass" onclick="manageHeaderLinks()">☰ إدارة روابط القائمة</button>
+      <button class="btn-admin btn-pass" onclick="saveLocalChanges()">💾 حفظ التعديلات</button>
+      <button class="btn-admin btn-pass" onclick="exportDataBackup()">⬇️ نسخة احتياطية</button>
+      <button class="btn-admin btn-pass" onclick="triggerBackupRestore()">↥ استعادة نسخة</button>
+      <input id="kbBackupFile" type="file" accept="application/json,.json" hidden onchange="importDataBackup(this.files[0])">
+      <button class="btn-admin btn-export" onclick="exportUpdatedHTML()">⬇️ تحميل ملف HTML النهائي</button>
+      <button class="btn-admin btn-exit-admin" onclick="toggleAdminMode(false)">خروج من التعديل</button>
+    </div>
+  </div>
+
+  <!-- ================= 3. الهيدر العلوي ================= -->
+  <header>
+    <div class="header-right">
+      <div class="brand-logo">
+        <img src="images/4level1-logo-white.png" alt="4Level1 English Language Institute" class="brand-logo-image">
+      </div>
+      <div class="v-divider"></div>
+      <div class="kb-label editable-text" data-key="kbTitle">قاعدة المعرفة</div>
+    </div>
+
+    <!-- البحث السريع: يظهر عند الطلب داخل الهيدر بين الهوية والقائمة -->
+    <section id="quickSearchPanel" class="quick-search-panel" aria-label="البحث في قاعدة المعرفة">
+      <div class="quick-search-field">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></svg>
+        <input id="quickSearchInput" type="search" placeholder="ابحث في قاعدة المعرفة بالكامل..." oninput="handleQuickSearchInput()" aria-label="البحث في قاعدة المعرفة">
+        <button type="button" class="quick-search-close" aria-label="مسح البحث" title="مسح البحث" onclick="clearQuickSearch()">×</button>
+      </div>
+      <div id="quickSearchResults" class="quick-search-results"><div class="search-empty-state">اكتب كلمة أو عبارة للبحث في جميع المجلدات والأجزاء.</div></div>
+    </section>
+
+    <nav>
+      <a class="active-nav" onclick="resetSearch()">🏠 الرئيسية</a>
+      <a onclick="openCategory(2)">الإجراءات والسياسات ▾</a>
+      <a onclick="openCategory(1)">الأنظمة والأدوات ▾</a>
+      <a onclick="openCategory(3)">الحالات والسيناريوهات</a>
+      <a onclick="openCategory(7)">الأسئلة الشائعة</a>
+    </nav>
+
+    <div class="header-left">
+      <button class="icon-btn icon-btn-admin" title="تفعيل وضع التعديل (للإدارة)" aria-label="تفعيل وضع الإدارة" onclick="requestAdminAccess()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 13.5a7.7 7.7 0 0 0 0-3l1.35-1.05-1.55-2.68-1.65.52a7.4 7.4 0 0 0-2.58-1.5L14.7 4h-3.1l-.27 1.79a7.4 7.4 0 0 0-2.58 1.5L7.1 6.77 5.55 9.45 6.9 10.5a7.7 7.7 0 0 0 0 3l-1.35 1.05 1.55 2.68 1.65-.52a7.4 7.4 0 0 0 2.58 1.5L11.6 20h3.1l.27-1.79a7.4 7.4 0 0 0 2.58-1.5l1.65.52 1.55-2.68z"/></svg></button>
+      <div class="profile-identity">
+        <button class="icon-btn icon-btn-profile" title="الملف الشخصي - قريبًا" aria-label="الملف الشخصي" onclick="toggleProfileMenu()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg></button>
+        <span id="headerUserName" class="header-user-name">أحمد عيد</span>
+      </div>
+      <button class="icon-btn icon-btn-logout" title="تسجيل الخروج" aria-label="تسجيل الخروج" onclick="logoutUser()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H5.8A1.8 1.8 0 0 0 4 6.8v10.4A1.8 1.8 0 0 0 5.8 19H10"/><path d="M14 8l4 4-4 4M18 12H9"/></svg></button>
+      <div id="profileMenu" class="profile-menu" hidden>
+        <strong id="profileMenuName">أحمد عيد</strong>
+        <button type="button" disabled>تعديل الاسم <small>قريبًا</small></button>
+        <button type="button" disabled>تغيير كلمة المرور <small>قريبًا</small></button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= 4. البنر الرئيسي ================= -->
+  <section class="hero">
+    <div class="hero-grid">
+      <div class="hero-copy" dir="rtl" lang="ar">
+        <div class="hero-welcome editable-text" data-key="heroWelcomeAr">مرحبًا بك في</div>
+        <h1 class="editable-text" data-key="heroHeadingAr">قاعدة معرفة 4Level1</h1>
+        <p class="hero-sub editable-text" data-key="heroSubAr">وجهتك للوصول إلى الإجراءات والأدلة والأدوات والدعم اليومي.</p>
+
+        <div class="hero-search-container">
+          <div class="search-wrapper" dir="rtl">
+            <span class="search-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="10.8" cy="10.8" r="6.8"></circle><path d="m16 16 5 5"></path></svg></span>
+            <input type="text" id="globalSearch" oninput="handleSearch()" placeholder="ابحث عن موضوع أو إجراء أو كلمة مفتاحية..." aria-label="ابحث في قاعدة المعرفة">
+          </div>
+          <div id="heroSearchResults" class="hero-search-results" hidden aria-live="polite"></div>
+        </div>
+
+        <div class="hero-features" dir="rtl">
+          <div class="h-feat">
+            <span class="h-feat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5.5A3.5 3.5 0 0 1 7.5 2H20v17H7.5A3.5 3.5 0 0 0 4 22z"></path><path d="M4 5.5v16.5M7.5 2v17"></path></svg></span>
+            <div class="h-feat-txt"><strong>وصول سريع</strong><span>اعثر على ما تحتاجه بسهولة</span></div>
+          </div>
+          <div class="h-feat">
+            <span class="h-feat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="5"></circle><circle cx="12" cy="12" r="1.5"></circle></svg></span>
+            <div class="h-feat-txt"><strong>محتوى موحّد</strong><span>معلومات معتمدة ومحدّثة</span></div>
+          </div>
+          <div class="h-feat">
+            <span class="h-feat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m13 2-9 12h7l-1 8 10-13h-7z"></path></svg></span>
+            <div class="h-feat-txt"><strong>عملي وتطبيقي</strong><span>حالات واقعية وأمثلة عملية</span></div>
+          </div>
+          <div class="h-feat">
+            <span class="h-feat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"></path></svg></span>
+            <div class="h-feat-txt"><strong>لفريقنا</strong><span>مصمم خصيصًا لفريق 4Level1</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="hero-image-panel" role="img" aria-label="4Level1 English Language Institute workspace"></div>
+    </div>
+  </section>
+
+  <!-- ================= 5. المحتوى الرئيسي ================= -->
+  <main class="main-container">
+    <!-- أقسام الصفحة الرئيسية تُدار ديناميكيًا من لوحة الإدارة -->
+    <div id="homeLibrarySections" class="home-library-sections"></div>
+
+    <!-- قسم آخر التحديثات -->
+    <section class="updates-box">
+      <div class="updates-header">
+        <div class="updates-title">
+          <span style="font-size: 28px;">📢</span>
+          <div>
+            <h2>آخر التحديثات</h2>
+            <p>أهم المستجدات والإعلانات لفريق العمل.</p>
+          </div>
+        </div>
+        <button class="btn-view-all" id="addUpdateBtn" style="display:none; background:#10B981; color:white; border:none;" onclick="addNewUpdateItem()">+ إضافة تحديث جديد</button>
+      </div>
+
+      <div class="updates-grid" id="updatesGrid"></div>
+    </section>
+  </main>
+
+  <!-- ================= صفحة القسم التفصيلية ================= -->
+  <main id="categoryPage" class="category-page" style="display:none;">
+    <div class="category-page-toolbar">
+      <div class="category-back-actions"><button class="btn-back-home" onclick="goBack()">← العودة للسابق</button></div>
+      <span id="categoryPageBreadcrumb">قاعدة المعرفة</span>
+    </div>
+    <section class="category-page-hero">
+      <div class="category-page-icon" id="categoryPageIcon"></div>
+      <div class="category-page-heading">
+        <h1 id="categoryPageTitle"></h1>
+        <p id="categoryPageSubtitle"></p>
+      </div>
+    </section>
+    <section id="categoryAdminEditor" class="category-admin-editor" style="display:none;"></section>
+    <section class="category-page-content">
+      <div id="bulkDeleteToolbar" class="bulk-delete-toolbar" hidden></div>
+      <div class="category-content-heading">
+        <h2>محتوى القسم</h2>
+        <span id="categoryArticleCount"></span>
+      </div>
+      <div id="categoryArticles" class="category-articles"></div>
+      <div id="categoryArticleEditor"></div>
+    </section>
+  </main>
+
+  <!-- ================= نافذة إنشاء صفحة جديدة ================= -->
+  <div class="modal-backdrop" id="newPageModal" onclick="if(event.target===this) closeNewPageForm()">
+    <div class="modal-window new-page-window">
+      <div class="modal-head">
+        <h3>＋ إنشاء صفحة جديدة</h3>
+        <button class="close-modal" onclick="closeNewPageForm()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="editor-form">
+          <h4>بيانات الصفحة والكارت</h4>
+          <label for="newPageTitle">اسم الصفحة</label>
+          <input id="newPageTitle" type="text" placeholder="اكتب اسم القسم">
+          <label for="newPageSubtitle">وصف مختصر</label>
+          <input id="newPageSubtitle" type="text" placeholder="اكتب وصفاً مختصراً للقسم">
+          <label for="newPageIcon">الأيقونة (Emoji أو رمز)</label>
+          <input id="newPageIcon" type="text" value="📁" maxlength="8" oninput="updateNewPageIconPreview()">
+          <label for="newPageIconFile">أو ارفع صورة للأيقونة</label>
+          <input id="newPageIconFile" type="file" accept="image/*" onchange="previewNewPageIcon(event)">
+          <div id="newPageIconPreview" class="icon-upload-preview">📁</div>
+          <button type="button" class="btn-admin btn-pass" onclick="clearNewPageIconImage()">استخدام الرمز بدل الصورة</button>
+          <button class="btn-add-art" onclick="createCategoryPage()">إنشاء الصفحة وإضافتها للرئيسية</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="headerLinksModal" onclick="if(event.target===this) closeHeaderLinks()"><div class="modal-window"><div class="modal-head"><h3>إدارة روابط القائمة</h3><button class="close-modal" onclick="closeHeaderLinks()">✕</button></div><div class="modal-body" id="headerLinksEditor"></div></div></div>
+
+  <!-- إضافة آخر تحديث: رسالة سريعة أو موضوع مستقل -->
+  <div class="modal-backdrop" id="newUpdateModal" onclick="if(event.target===this) closeNewUpdateModal()">
+    <div class="modal-window new-update-window">
+      <div class="modal-head"><h3>＋ إضافة إلى آخر التحديثات</h3><button class="close-modal" onclick="closeNewUpdateModal()">✕</button></div>
+      <div class="modal-body">
+        <div class="update-type-tabs" role="tablist">
+          <button type="button" class="update-type-tab active" id="quickUpdateTab" onclick="setNewUpdateMode('quick')">رسالة سريعة</button>
+          <button type="button" class="update-type-tab" id="topicUpdateTab" onclick="setNewUpdateMode('topic')">موضوع</button>
+        </div>
+        <div id="quickUpdateForm" class="update-form-panel">
+          <label for="quickUpdateTitle">عنوان الرسالة</label><input id="quickUpdateTitle" type="text" placeholder="مثال: تذكير بمواعيد الحضور">
+          <label for="quickUpdateBadge">نوع الرسالة</label>
+          <select id="quickUpdateBadge"><option value="تذكير">تذكير</option><option value="تحديث">تحديث</option><option value="جديد" selected>جديد</option><option value="إعلان">إعلان</option></select>
+          <label for="quickUpdateDesc">وصف مختصر (اختياري)</label><input id="quickUpdateDesc" type="text" placeholder="جملة قصيرة تظهر على الكارت">
+          <label for="quickUpdateDetails">محتوى الرسالة</label><textarea id="quickUpdateDetails" rows="5" placeholder="اكتب الرسالة التي ستظهر عند فتح التحديث..."></textarea>
+          <button type="button" class="btn-add-art" onclick="saveQuickUpdate()">حفظ الرسالة</button>
+        </div>
+        <div id="topicUpdateForm" class="update-form-panel" hidden oninput="syncCurrentEditorToDatabase()">
+          <label for="topicUpdateTitle">عنوان الموضوع</label><input id="topicUpdateTitle" type="text" placeholder="اكتب عنوان الموضوع">
+          <label for="topicUpdateDesc">وصف مختصر (اختياري)</label><input id="topicUpdateDesc" type="text" placeholder="وصف يظهر على كارت آخر التحديثات">
+          <div class="sections-editor topic-sections-editor">
+            <h4>أجزاء المحتوى</h4>
+            <div id="topicRichToolbar" class="topic-rich-toolbar"></div>
+            <div id="topicSectionsEditor" class="content-sections-list"></div>
+            <button type="button" class="btn-add-art" onclick="addTopicContentSection()">＋ إضافة جزء محتوى</button>
+          </div>
+          <button type="button" class="btn-add-art topic-save-button" onclick="saveTopicUpdate()">حفظ الموضوع ونشره</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- عرض الرسالة السريعة -->
+  <div class="modal-backdrop" id="quickNoticeModal" onclick="if(event.target===this) closeQuickNotice()">
+    <div class="modal-window quick-notice-window"><div class="modal-head"><h3 id="quickNoticeTitle">التحديث</h3><button class="close-modal" onclick="closeQuickNotice()">✕</button></div><div class="modal-body"><span id="quickNoticeBadge" class="badge"></span><div id="quickNoticeBody" class="quick-notice-body"></div></div></div>
+  </div>
+
+  <!-- صفحة الموضوع المستقل: ليست مجلدًا ضمن قاعدة المعرفة -->
+  <main id="updateTopicPage" class="category-page update-topic-page" style="display:none;">
+    <div class="category-page-toolbar"><div class="category-back-actions"><button class="btn-back-home" onclick="closeUpdateTopic()">← العودة للسابق</button></div><span>آخر التحديثات / موضوع</span></div>
+    <section class="category-page-hero update-topic-hero"><div class="category-page-icon">📘</div><div class="category-page-heading"><span id="updateTopicBadge" class="badge b-new">موضوع</span><h1 id="updateTopicTitle"></h1><p id="updateTopicDesc"></p></div></section>
+    <section id="updateTopicSections" class="topic-page-sections"></section>
+  </main>
+
+  <input id="richImageUpload" type="file" accept="image/*" multiple hidden onchange="insertRichImages(event)">
+
+  <!-- أدوات التنسيق العائمة: تظهر عند طلبها أثناء تحرير المحتوى -->
+  <button type="button" id="richToolbarLauncher" class="rich-toolbar-launcher" hidden onclick="toggleFloatingRichToolbar()" aria-label="إظهار أدوات التنسيق">Aa <span>تنسيق</span></button>
+  <div id="floatingRichToolbar" class="floating-rich-toolbar" hidden role="region" aria-label="شريط أدوات تنسيق المحتوى">
+    <div class="floating-rich-toolbar-head"><strong>أدوات تنسيق المحتوى</strong><button type="button" class="floating-rich-toolbar-close" onclick="hideFloatingRichToolbar(false)" aria-label="إخفاء أدوات التنسيق">×</button></div>
+    <div id="floatingRichToolbarContent"></div>
+  </div>
+
+  <!-- اختصارات الحركة والبحث السريع: تظهر بعد النزول لأسفل الصفحة -->
+  <aside id="quickNavRail" class="quick-nav-rail" aria-label="اختصارات التنقل">
+    <button type="button" class="quick-nav-button" title="العودة للسابق" aria-label="العودة للسابق" onclick="goBack()"><svg viewBox="0 0 24 24"><path d="M19 12H5m0 0 6-6m-6 6 6 6"/></svg></button>
+    <button type="button" class="quick-nav-button" title="الرئيسية" aria-label="الرئيسية" onclick="goHomeFromQuickNav()"><svg viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg></button>
+    <button type="button" class="quick-nav-button quick-search-trigger" title="بحث سريع" aria-label="فتح البحث السريع" onclick="openQuickSearch(true)"><svg viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></svg></button>
+  </aside>
+
+
+
+
+  <!-- ================= 6. نافذة عرض/تعديل محتوى أي قسم ================= -->
+  <div class="modal-backdrop" id="categoryModal" onclick="if(event.target===this) closeModal()">
+    <div class="modal-window">
+      <div class="modal-head">
+        <h3 id="modalTitle">عنوان القسم</h3>
+        <button class="close-modal" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+
+  <!-- ================= 7. قاعدة البيانات المدمجة (تتحدث تلقائياً عند التصدير) ================= -->
+  <script id="kb-database" type="application/json">
+  {
+    "staffPass": "1234",
+    "adminPass": "admin",
+    "texts": {
+      "brandName": "4Level1",
+      "brandSub": "معهد اللغة الإنجليزية",
+      "kbTitle": "قاعدة المعرفة",
+      "heroWelcome": "Welcome to",
+      "heroHeading": "4Level1 Knowledge Base",
+      "heroSub": "Your Go-To Hub for Processes, Guides, Tools, and Everyday Support."
+    },
+    "categories": [
+      {
+        "id": 0,
+        "icon": "👥",
+        "title": "نبذة عن الإدارة",
+        "subtitle": "التعريف، الهيكل، والأدوار",
+        "articles": [
+          { "title": "رؤية ورسالة الأكاديمية", "content": "هنا يمكنك كتابة نبذة تعريفية عن 4Level1 وأهداف الفريق والهيكل التنظيمي." }
+        ]
+      },
+      {
+        "id": 1,
+        "icon": "💻",
+        "title": "الأنظمة والأدوات",
+        "subtitle": "المنصات، طرق الوصول، وأدلة الاستخدام",
+        "articles": [
+          { "title": "دليل استخدام نظام CRM", "content": "1. الدخول عبر الرابط الرسمي.\n2. تسجيل بيانات الطالب بدقة.\n3. حفظ المتابعة اليومية." }
+        ]
+      },
+      {
+        "id": 2,
+        "icon": "📚",
+        "title": "الإجراءات والسياسات",
+        "subtitle": "خطوات العمل من البداية للنهاية",
+        "articles": [
+          { "title": "سياسة الحضور والانصراف", "content": "يرجى الالتزام بمواعيد العمل الرسمية وتسجيل الدخول قبل بدء الشيفت بـ 10 دقائق." }
+        ]
+      },
+      {
+        "id": 3,
+        "icon": "💬",
+        "title": "الحالات والسيناريوهات",
+        "subtitle": "مواقف واقعية وإجراءات مقترحة",
+        "articles": [
+          { "title": "سيناريو: طالب يرغب في تأجيل المستوى", "content": "يتم مراجعة حالة الطالب على النظام والتأكد من استيفاء شروط التأجيل قبل رفع الطلب." }
+        ]
+      },
+      {
+        "id": 4,
+        "icon": "📋",
+        "title": "القوالب ونماذج التواصل",
+        "subtitle": "نماذج جاهزة ورسائل معتمدة",
+        "articles": [
+          { "title": "رسالة الترحيب بطالب جديد (واتساب)", "content": "أهلاً بك في عائلة 4Level1! يسعدنا انضمامك إلينا في رحلة تعلم اللغة الإنجليزية..." }
+        ]
+      },
+      {
+        "id": 5,
+        "icon": "⚠️",
+        "title": "استكشاف المشكلات وحلها",
+        "subtitle": "أشهر المشكلات والحلول",
+        "articles": [
+          { "title": "مشكلة عدم وصول رابط الحصة للطالب", "content": "تأكد من تحديث البريد الإلكتروني ورقم الواتساب المسجل للطالب على النظام." }
+        ]
+      },
+      {
+        "id": 6,
+        "icon": "🔀",
+        "title": "مصفوفة التصعيد",
+        "subtitle": "متى وأين يتم التصعيد",
+        "articles": [
+          { "title": "متى يتم تصعيد الشكوى للمشرف؟", "content": "في حال طلب استرداد استثنائي أو وجود مشكلة تقنية مستمرة لأكثر من 24 ساعة." }
+        ]
+      },
+      {
+        "id": 7,
+        "icon": "❓",
+        "title": "الأسئلة الشائعة",
+        "subtitle": "أكثر الاستفسارات تكراراً وإجاباتها",
+        "articles": [
+          { "title": "ما هي مدة كل مستوى دراسي؟", "content": "مدة المستوى الواحد 4 أسابيع بواقع 3 محاضرات أسبوعياً." }
+        ]
+      }
+    ],
+    "updates": [
+      { "badge": "تذكير", "badgeClass": "b-reminder", "icon": "📅", "title": "جدول التدريبات – نوفمبر", "desc": "اطلع على التدريبات القادمة", "details": "تم تحديث جدول التدريبات لشهر نوفمبر، يرجى مراجعة المواعيد مع مديرك المباشر." },
+      { "badge": "جديد", "badgeClass": "b-new", "icon": "📖", "title": "دليل التعامل مع الشكاوى", "desc": "الخطوات وأفضل الممارسات", "details": "دليل شامل لخطوات امتصاص غضب العميل وحل المشكلة من أول تواصل." },
+      { "badge": "تحديث", "badgeClass": "b-update", "icon": "⚙️", "title": "دليل الدخول إلى الأنظمة", "desc": "خطوات جديدة للدخول", "details": "تم تفعيل الدخول الموحد لجميع موظفي خدمة العملاء والمبيعات." },
+      { "badge": "جديد", "badgeClass": "b-new", "icon": "📄", "title": "تحديث إجراءات استرداد المبلغ", "desc": "ساري من نوفمبر 2026", "details": "تُطبق الشروط المحدثة للاسترداد اعتباراً من بداية شهر نوفمبر 2026." }
+    ]
+  }
+  </script>
+
+  <script src="js/script.js"></script>
+</body>
+</html>
