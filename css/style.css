@@ -1087,6 +1087,7 @@ header { position:relative; }
 .topic-rich-toolbar .content-format-toolbar { box-shadow:0 5px 14px rgba(15,35,66,.09); }
 .format-painter-button { display:inline-flex; align-items:center; gap:5px; }
 .format-painter-button.is-armed { background:#FEF3C7 !important; color:#92400E !important; border-color:#F59E0B !important; box-shadow:0 0 0 2px rgba(245,158,11,.15); }
+.format-painter-button.is-sticky { background:#FFC400 !important; color:#0F2342 !important; border-color:#E0A800 !important; box-shadow:0 0 0 3px rgba(255,196,0,.35); }
 @media(max-width:700px) {
   .bulk-delete-toolbar { align-items:flex-start; }
   .bulk-delete-actions { width:100%; }
